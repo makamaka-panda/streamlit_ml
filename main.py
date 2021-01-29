@@ -1,13 +1,11 @@
-import streamlit as st
 import pandas as pd
 import seaborn as sns
-#import numpy as np
 from matplotlib import pyplot as plt
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+import streamlit as st
 
-#import time
 
 st.set_option('deprecation.showPyplotGlobalUse', False)
 
@@ -31,65 +29,53 @@ def exploratory_func(dataframe):
     df.insert(0, 'dtype', dataframe.dtypes.values)
     return df
 
-def heatmap(dataframe, cols = []):
-    st.header('Heatmap')
-    st.subheader('Select numeric features:')
+def heatmap(dataframe, cols=[]]):
+    st.header('ヒートマップ')
+    st.subheader('特徴量を選択')
     numcols = tuple(dataframe.select_dtypes(exclude='object').columns)
-    check = st.checkbox('Select all', key = 0)
+    check = st.checkbox('全ての特徴量を選択', key = 0)
     if check:
         cols = list(numcols)
-    select = st.multiselect('Numeric features:', numcols, default=cols, key = 0)
-    if (len(select) > 10):
-        annot = False
-    else:
-        annot = True
+    select = st.multiselect('特徴量を選択してください', numcols, default=cols, key=0)
     if (len(select) > 1):
-        sns.heatmap(dataframe[select].corr(), annot=annot)
+        sns.heatmap(dataframe[select].corr())
         return st.pyplot()
+    else:
+        return st.markdown('特徴量を二つ以上選択してください')
 
-def pairplot(dataframe, cols = []):
-    st.header('Pairplot')
-    st.subheader('Select numeric features and 1 categorical feature at most')
-    catcols = ['-']
-    for i in list(dataframe.select_dtypes(include='object').columns):
-        catcols.append(i)
-    catcols = tuple(catcols)
-    numcols = tuple(dataframe.select_dtypes(exclude='object').columns)
-    check = st.checkbox('Select all', key = 1)
+def pairplot(dataframe, cols=[]):
+    st.header('散布図行列')
+    st.subheader('数値の特徴量と色相にしたい特徴量を選択')
+    numcols = dataframe.select_dtypes(exclude='object').columns
+    catcols = ['色相にしたい説明変数を選択'] + list(dataframe.columns)
+    check = st.checkbox('全ての変数を選択', key=1)
     if check:
         cols = list(numcols)
-    select = st.multiselect('Numeric features:', numcols, default=cols, key = 1)
-    hue = st.selectbox('Select hue', catcols, key = 0)
+    select = st.multiselect('Numeric features:', tuple(numcols), default=cols, key=1)
+    hue = st.selectbox('色相にする説明変数を選択', tuple(catcols), key=1)
 
     if (len(select) > 1):
-        if hue == '-':
+        if hue == '色相にしたい説明変数を選択':
             sns.pairplot(dataframe[select])
             return st.pyplot()
         else:
             try:
                 copy = select
                 copy.append(hue)
-                sns.pairplot(dataframe[copy], hue = hue)
+                sns.pairplot(dataframe[copy], hue=hue)
                 return st.pyplot()
             except:
-                st.markdown("An error occurred, please don't use hue for this dataframe")
+                st.markdown("エラーが発生")
 
-def boxplot(dataframe):
-    st.header('Select features for the Violinplot')
-    numcol = tuple(dataframe.select_dtypes(exclude='object').columns)
-    catcol = tuple(dataframe.select_dtypes(include='object').columns)
-    select1 = st.selectbox('Selecione a numeric feature', numcol)
-    select2 = st.selectbox('Selecione a categorical feature', catcol)
-    sns.violinplot(data = dataframe, x = select2, y = select1)
+def violinplot(dataframe):
+    st.header('バイオリンプロット')
+    number_columns = tuple(dataframe.select_dtypes(exclude='object').columns)
+    select1 = st.selectbox('数値の特徴量を選択', number_columns)
+    all_columns = tuple(dataframe.columns)
+    select2 = st.selectbox('特徴量を選択', all_columns)
+    sns.violinplot(data=dataframe, x=select2, y=select1)
     return st.pyplot()
 
-def scatter(dataframe):
-    st.header('Select features for the Scatterplot')
-    numcol = tuple(dataframe.select_dtypes(exclude='object').columns)
-    select1 = st.selectbox('Select numeric feature', numcol)
-    select2 = st.selectbox('Select another numeric feature', numcol)
-    plt.scatter(dataframe[select1], dataframe[select2])
-    return st.pyplot()
 
 def valuecounts(dataframe):
     select = st.selectbox('Select one feature:', tuple(dataframe.columns))
@@ -97,28 +83,19 @@ def valuecounts(dataframe):
 
 def drop(dataframe, select):
     if len(select) != 0:
-        return dataframe.drop(select, 1)
+        return dataframe.drop(select, axis=1)
     else:
         return dataframe
 
 def main():
 
     st.title('ランダムフォレストの検証')
-    # st.image('ia.jpg', use_column_width=True)
     file = st.file_uploader('CSVファイルをアップロードしてください', type='csv')
     if file is not None:
-
         st.sidebar.header('設定')
-        st.sidebar.subheader('使用するグラフ')
-        check_heatmap = st.sidebar.checkbox('Heatmap')
-        check_pairplot = st.sidebar.checkbox('Pairplot')
-        check_violinplots = st.sidebar.checkbox('Violinplots')
-        check_scatterplot = st.sidebar.checkbox('Scatterplot')
-        df0 = pd.DataFrame(readcsv(file))
-        st.sidebar.subheader('使用しない項目')
-        sidedrop = st.sidebar.multiselect('使用しない項目: ', tuple(df0.columns))
-        df = drop(df0, sidedrop)
-        st.sidebar.subheader('予測')
+        df_original = pd.DataFrame(readcsv(file))
+        sidedrop = st.sidebar.multiselect('使用しない項目: ', tuple(df_original.columns))
+        df = drop(df_original, sidedrop)
         model = st.sidebar.selectbox('回帰か分類かを選択', ('Regressor','Classifier'))
         target = st.sidebar.selectbox('目的変数を選択:', tuple(df.columns))
 
@@ -129,14 +106,11 @@ def main():
         st.header('各説明変数の値の数')
         valuecounts(df)
 
-        if check_heatmap:
+        show_figure = st.checkbox('図を表示するかどうか')
+        if show_figure:
             heatmap(df)
-        if check_pairplot:
             pairplot(df)
-        if check_violinplots:
-            boxplot(df)
-        if check_scatterplot:
-            scatter(df)
+            violinplot(df)
 
         st.header('ランダムフォレスト:')
         X = pd.get_dummies(df.drop(target,1))
@@ -157,7 +131,7 @@ def main():
             #plt.figure(num=None, figsize=(6, 4), facecolor='w', edgecolor='k')
             feat_importances = pd.Series(rf.feature_importances_, index=X.columns)
             st.subheader('影響力のある特徴量:')
-            feat_importances.nlargest(10).plot(kind='barh', figsize = (8,8))
+            feat_importances.nlargest(10).plot(kind='barh', figsize=(8,8))
             st.pyplot()
 
 
